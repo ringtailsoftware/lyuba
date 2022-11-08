@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "shell.h"
 
-#define CMDBUF_SIZE_BYTES 128
+#define CMDBUF_SIZE_BYTES 512
 #define MAXARGS 2
 
 static uint8_t cmdbuf_len;
