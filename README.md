@@ -98,4 +98,4 @@ On successful tooting, `ok`=`true`. On failure `ok`=`false`
 
 Lyuba is MIT licensed.
 
-See other source files for their respecive licenses
+See other source files for their respective licenses
