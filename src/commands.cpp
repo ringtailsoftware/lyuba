@@ -41,15 +41,7 @@ static void cmd_toot(uint8_t argc, const char **argv) {
     }
 }
 
-static void cmd_dump(uint8_t argc, const char **argv) {
-    int i;
-    for (i=0;i<argc;i++) {
-        Serial.printf("'%s'\r\n", argv[0]);
-    }
-}
-
 const struct cmdtable_s cmdtab[] = {
-    {"dump", "", cmd_dump},
     {"getauth", "", cmd_getauth},
     {"auth", "", cmd_auth},
     {"toot", "", cmd_toot},
