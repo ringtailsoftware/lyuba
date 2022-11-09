@@ -27,16 +27,20 @@ typedef enum {
     LYUBASTATE_TOKEN_SETUP,
     LYUBASTATE_TOKEN_SETUP_WAITRSP,
     LYUBASTATE_TOKEN_SETUP_DONE,
-    LYUBASTATE_READY_TO_TOOT,
-    LYUBASTATE_READY_TO_TOOT_NOTIFY,
+    LYUBASTATE_READY,
+    LYUBASTATE_READY_NOTIFY,
     LYUBASTATE_TOOT_SETUP,
     LYUBASTATE_TOOT_SETUP_WAITRSP,
+    LYUBASTATE_SEARCHTAG_SETUP,
+    LYUBASTATE_SEARCHTAG_SETUP_WAITRSP,
+    LYUBASTATE_SEARCHTAG_SETUP_DONE,
 } web_state_t;
 
-#define MAX_HTTP_OUTPUT_BUFFER 2048 // largest HTTP response we can handle
+#define MAX_HTTP_OUTPUT_BUFFER 8192 // largest HTTP response we can handle, smaller would be ok without search
 
 static volatile lyuba_auth_cb_t authCb = NULL;
 static volatile lyuba_toot_cb_t tootCb = NULL;
+static volatile lyuba_search_cb_t searchCb = NULL;
 
 static web_state_t lyubastate = LYUBASTATE_INIT;
 
@@ -48,6 +52,7 @@ static char client_secret[128];
 static char access_token[256];
 static char negotiated_bearer_access_token[256];
 static char postBuf[1300];  // largest HTTP POST we can make
+static char tagBuf[128];
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     switch(evt->event_id) {
@@ -104,7 +109,10 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
                     lyubastate = LYUBASTATE_TOKEN_SETUP_DONE;
                 break;
                 case LYUBASTATE_TOOT_SETUP_WAITRSP:
-                    lyubastate = LYUBASTATE_READY_TO_TOOT_NOTIFY;
+                    lyubastate = LYUBASTATE_READY_NOTIFY;
+                break;
+                case LYUBASTATE_SEARCHTAG_SETUP_WAITRSP:
+                    lyubastate = LYUBASTATE_SEARCHTAG_SETUP_DONE;
                 break;
                 default:
                     Serial.printf("Unexpected status on HTTP FINISH\r\n");
@@ -168,6 +176,47 @@ static bool post_request(const char *path, const char *post_data, bool useBearer
     }
 }
 
+static bool get_request(const char *path, const char *post_data, bool useBearer) {
+    uint32_t err;
+    esp_http_client_config_t config;
+
+    memset(&config, 0x00, sizeof(config));
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.host = MASTODON_HOST;
+    config.path = path;
+    config.event_handler = _http_event_handler;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    // clear response buffer
+    httpBufCount = 0;
+    // make request
+    esp_http_client_set_method(client, HTTP_METHOD_GET);
+    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+    if (useBearer) {
+        esp_http_client_set_header(client, "Authorization", negotiated_bearer_access_token);
+    }
+    esp_http_client_set_post_field(client, post_data, strlen(post_data));
+    err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+#ifdef LYUBA_DEBUG
+        Serial.printf("HTTP POST Status = %d, content_length = %d\r\n",
+                esp_http_client_get_status_code(client),
+                esp_http_client_get_content_length(client));
+#endif
+        if (esp_http_client_get_status_code(client) == 200) {
+            return true;
+        } else {
+            Serial.printf("HTTP status code %d\r\n", esp_http_client_get_status_code(client));
+            return false;
+        }
+    } else {
+        Serial.printf("HTTP POST request failed: %s", esp_err_to_name(err));
+        return false;
+    }
+}
+
+
 void lyuba_init(void) {
     lyubastate = LYUBASTATE_INIT;
     httpBufCount = 0;
@@ -189,6 +238,12 @@ static bool lyubastate_toot_setup(void) {
     return post_request("/api/v1/statuses", postBuf, true);
 }
 
+static bool lyubastate_search_setup(void) {
+    // postBuf already contains tag from lyuba_search()
+    char url[512];
+    snprintf(url, sizeof(url), "/api/v1/timelines/tag/%s", tagBuf);
+    return get_request(url, "limit=1", true);
+}
 
 void lyuba_loop(void) {
     cJSON *json;
@@ -304,7 +359,7 @@ void lyuba_loop(void) {
                 strncpy(access_token, json_access_token->valuestring, sizeof(access_token));
                 snprintf(negotiated_bearer_access_token, sizeof(negotiated_bearer_access_token), "Bearer %s", json_access_token->valuestring);
                 cJSON_Delete(json);
-                lyubastate = LYUBASTATE_READY_TO_TOOT;
+                lyubastate = LYUBASTATE_READY;
 
                 // write new auth data to flash
                 preferences_lyuba.putString("auth", negotiated_bearer_access_token);
@@ -315,20 +370,20 @@ void lyuba_loop(void) {
             }
         break;
 
-        case LYUBASTATE_READY_TO_TOOT_NOTIFY:
-            lyubastate = LYUBASTATE_READY_TO_TOOT;
+        case LYUBASTATE_READY_NOTIFY:
+            lyubastate = LYUBASTATE_READY;
             if (NULL != tootCb) {
                 tootCb(true);
             }
         break;
 
-        case LYUBASTATE_READY_TO_TOOT:
+        case LYUBASTATE_READY:
         break;
 
         case LYUBASTATE_TOOT_SETUP:
             lyubastate = LYUBASTATE_TOOT_SETUP_WAITRSP;
             if (!lyubastate_toot_setup()) {
-                lyubastate = LYUBASTATE_READY_TO_TOOT;
+                lyubastate = LYUBASTATE_READY;
                 if (NULL != tootCb) {
                     tootCb(false);
                 }
@@ -336,6 +391,72 @@ void lyuba_loop(void) {
         break;
 
         case LYUBASTATE_TOOT_SETUP_WAITRSP:
+        break;
+
+        case LYUBASTATE_SEARCHTAG_SETUP:
+            lyubastate = LYUBASTATE_SEARCHTAG_SETUP_WAITRSP;
+            if (!lyubastate_search_setup()) {
+                lyubastate = LYUBASTATE_READY;
+                if (NULL != searchCb) {
+                    searchCb(false, NULL);
+                }
+            }
+        break;
+
+        case LYUBASTATE_SEARCHTAG_SETUP_WAITRSP:
+        break;
+
+        case LYUBASTATE_SEARCHTAG_SETUP_DONE:
+            lyubastate = LYUBASTATE_READY;
+            if (NULL == (json = cJSON_Parse((const char *)httpBuf))) {
+                Serial.printf("LYUBASTATE_SEARCHTAG_SETUP_DONE: Bad JSON\r\n");
+                lyubastate = LYUBASTATE_INIT;
+                if (NULL != searchCb) {
+                    searchCb(false, NULL);
+                }
+                break;
+            } else {
+                cJSON *json_status, *json_content;
+                if (!cJSON_IsArray(json) || cJSON_GetArraySize(json) < 1) {
+                    Serial.printf("LYUBASTATE_SEARCHTAG_SETUP_DONE: bad types in json statuses\r\n");
+                    lyubastate = LYUBASTATE_INIT;
+                    if (NULL != searchCb) {
+                        searchCb(false, NULL);
+                    }
+                    cJSON_Delete(json);
+                    break;
+                }
+                if (NULL == (json_status = cJSON_GetArrayItem(json, 0))) {
+                    Serial.printf("LYUBASTATE_SEARCHTAG_SETUP_DONE: bad json status\r\n");
+                    lyubastate = LYUBASTATE_INIT;
+                    if (NULL != searchCb) {
+                        searchCb(false, NULL);
+                    }
+                    cJSON_Delete(json);
+                    break;
+                }
+                if (NULL == (json_content = cJSON_GetObjectItem(json_status, "content"))) {
+                    Serial.printf("LYUBASTATE_SEARCHTAG_SETUP_DONE: bad json status\r\n");
+                    lyubastate = LYUBASTATE_INIT;
+                    if (NULL != searchCb) {
+                        searchCb(false, NULL);
+                    }
+                    cJSON_Delete(json);
+                    break;
+                }
+
+#ifdef LYUBA_DEBUG
+                Serial.printf("content='%s'\r\n", json_content->valuestring);
+#endif
+                // reuse postBuf, passing it back to user
+                strncpy(postBuf, json_content->valuestring, sizeof(postBuf));
+                cJSON_Delete(json);
+                lyubastate = LYUBASTATE_READY;
+                // pass back to user
+                if (NULL != searchCb) {
+                    searchCb(true, (const char *)postBuf);
+                }
+            }
         break;
     }
 }
@@ -348,7 +469,7 @@ void lyuba_toot(const char *user_bearer_access_token, const char *msg, lyuba_too
         return;
     }
 
-    if (!(lyubastate == LYUBASTATE_READY_TO_TOOT || lyubastate == LYUBASTATE_INIT)) {
+    if (!(lyubastate == LYUBASTATE_READY || lyubastate == LYUBASTATE_INIT)) {
         Serial.println("Can't toot, busy");
         if (_tootCb != NULL) {
             _tootCb(false);
@@ -362,8 +483,30 @@ void lyuba_toot(const char *user_bearer_access_token, const char *msg, lyuba_too
     }
 }
 
+void lyuba_searchTag(const char *user_bearer_access_token, const char *tag, lyuba_search_cb_t _searchCb) {
+    if (NULL == user_bearer_access_token || NULL == tag) {
+        if (_searchCb != NULL) {
+            _searchCb(false, NULL);
+        }
+        return;
+    }
+
+    if (!(lyubastate == LYUBASTATE_READY || lyubastate == LYUBASTATE_INIT)) {
+        Serial.println("Can't search, busy");
+        if (_searchCb != NULL) {
+            _searchCb(false, NULL);
+        }
+        return;
+    } else {
+        snprintf(tagBuf, sizeof(tagBuf), tag);
+        strncpy(negotiated_bearer_access_token, user_bearer_access_token, sizeof(negotiated_bearer_access_token));
+        searchCb = _searchCb;
+        lyubastate = LYUBASTATE_SEARCHTAG_SETUP;
+    }
+}
+
 void lyuba_authenticate(lyuba_auth_cb_t _authCb) {
-    if (lyubastate == LYUBASTATE_INIT || lyubastate == LYUBASTATE_READY_TO_TOOT) {
+    if (lyubastate == LYUBASTATE_INIT || lyubastate == LYUBASTATE_READY) {
         authCb = _authCb;
         lyubastate = LYUBASTATE_APP_SETUP;
     } else {

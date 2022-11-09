@@ -1,6 +1,6 @@
 # Lyuba, Mastodon tooter for ESP32
 
-Lyuba is a minimal library for tooting (posting) to the Mastodon social network.
+Lyuba is a minimal library for tooting (posting) and searching on the Mastodon social network.
 
 ## Getting started
 
@@ -36,6 +36,10 @@ You should see
 Send a toot, type:
 
     toot Hello World!
+
+Search for the most recent status for a hashtag:
+
+    search cheerlights
 
 ## Storage of access token
 
@@ -88,6 +92,16 @@ Where `tootCb` is a callback function. If `NULL` is used, tooting will occur but
     void tootCb(bool ok)
 
 On successful tooting, `ok`=`true`. On failure `ok`=`false`
+
+To search for a tag (only returns the most recently posted status), call:
+
+    void lyuba_searchTag(authToken, "cheerlights", searchCb);
+
+Where `searchCb` is a callback function:
+
+    void searchCb(bool ok, const char *content) { }
+
+On finding a status matching the given tag `ok`=`true` and `content` contains the status string (including HTML tags)
 
 ## Use without embedding password into firmware
 

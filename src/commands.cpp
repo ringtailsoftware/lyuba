@@ -22,6 +22,48 @@ static void toot_callback(bool ok) {
     }
 }
 
+// remove HTML tags from a string
+static bool stripHTML(const char *in, char *out, size_t outlen) {
+    bool inTag = false;
+    char c;
+    while((c = *in++)) {
+        if (!inTag) {
+            if (c == '<') {
+                inTag = true;
+            } else {
+                if (outlen-- == 0) {
+                    return false;
+                }
+                *out++ = c;
+            }
+        } else {
+            if (c == '>') {
+                inTag = false;
+            }
+        }
+    }
+    if (outlen-- == 0) {
+        return false;
+    }
+    *out++ = '\0';
+    return true;
+}
+
+
+static void search_callback(bool ok, const char *content) {
+    if (ok) {
+        Serial.println("Search OK");
+        char rawtext[1024];
+        if (!stripHTML(content, rawtext, sizeof(rawtext))) {
+            Serial.println("HTML tag strip failed!");
+        } else {
+            Serial.println(rawtext);
+        }
+    } else {
+        Serial.println("Search failure");
+    }
+}
+
 static void cmd_getauth(uint8_t argc, const char **argv) {
     authToken = lyuba_getAuthToken();
     if (authToken != NULL) {
@@ -41,10 +83,17 @@ static void cmd_toot(uint8_t argc, const char **argv) {
     }
 }
 
+static void cmd_search(uint8_t argc, const char **argv) {
+    if (argc > 0) {
+        lyuba_searchTag(authToken, argv[0], search_callback);
+    }
+}
+
 const struct cmdtable_s cmdtab[] = {
     {"getauth", "", cmd_getauth},
     {"auth", "", cmd_auth},
     {"toot", "", cmd_toot},
+    {"search", "", cmd_search},
     {NULL, NULL, NULL},
 };
 
