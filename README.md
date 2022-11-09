@@ -89,6 +89,17 @@ Where `tootCb` is a callback function. If `NULL` is used, tooting will occur but
 
 On successful tooting, `ok`=`true`. On failure `ok`=`false`
 
+## Use without embedding password into firmware
+
+For security reasons you might not want to embed a Mastodon password into your code. Lyuba can also work directly with an access token that you create from the web interface.
+
+In your Mastodon instance web site, go to "Preferences" -> "Development" -> "New application". Give the application a name, everything else is optional. Click "Submit", then click on your new application in the list. Read off the "Your access token" and note it down.
+
+The access token can be used with Lyuba by adding "Bearer " to the beginning and passing it to `lyuba_toot()`. For example, if your access token is "abc123", then you can toot with:
+
+    lyuba_init();
+    lyuba_toot("Bearer abc123", "Hello world", NULL);
+
 ## Notes
 
  - Lyuba should be considered insecure. No certificate checks are performed and your Mastodon password is baked into your firmware
