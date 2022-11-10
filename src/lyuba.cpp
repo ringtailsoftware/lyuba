@@ -58,17 +58,23 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     switch(evt->event_id) {
         default:
         break;
-#ifdef LYUBA_DEBUG
         case HTTP_EVENT_ERROR:
+#ifdef LYUBA_DEBUG
             Serial.printf("HTTP_EVENT_ERROR\r\n");
+#endif
             break;
         case HTTP_EVENT_ON_CONNECTED:
+#ifdef LYUBA_DEBUG
             Serial.printf("HTTP_EVENT_ON_CONNECTED\r\n");
+#endif
             break;
         case HTTP_EVENT_HEADER_SENT:
+#ifdef LYUBA_DEBUG
             Serial.printf("HTTP_EVENT_HEADER_SENT\r\n");
+#endif
             break;
         case HTTP_EVENT_ON_HEADER:
+#ifdef LYUBA_DEBUG
             Serial.printf("HTTP_EVENT_ON_HEADER, key=%s, value=%s\r\n", evt->header_key, evt->header_value);
             break;
 #endif
@@ -165,13 +171,16 @@ static bool post_request(const char *path, const char *post_data, bool useBearer
                 esp_http_client_get_content_length(client));
 #endif
         if (esp_http_client_get_status_code(client) == 200) {
+            esp_http_client_cleanup(client);
             return true;
         } else {
             Serial.printf("HTTP status code %d\r\n", esp_http_client_get_status_code(client));
+            esp_http_client_cleanup(client);
             return false;
         }
     } else {
-        Serial.printf("HTTP POST request failed: %s", esp_err_to_name(err));
+        Serial.printf("HTTP POST request failed: %s\r\n", esp_err_to_name(err));
+        esp_http_client_cleanup(client);
         return false;
     }
 }
@@ -205,13 +214,16 @@ static bool get_request(const char *path, const char *post_data, bool useBearer)
                 esp_http_client_get_content_length(client));
 #endif
         if (esp_http_client_get_status_code(client) == 200) {
+            esp_http_client_cleanup(client);
             return true;
         } else {
             Serial.printf("HTTP status code %d\r\n", esp_http_client_get_status_code(client));
+            esp_http_client_cleanup(client);
             return false;
         }
     } else {
         Serial.printf("HTTP POST request failed: %s", esp_err_to_name(err));
+        esp_http_client_cleanup(client);
         return false;
     }
 }
