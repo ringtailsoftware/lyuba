@@ -1,9 +1,7 @@
 #include <Wire.h>
 #include <Arduino.h>
-#include "shell.h"
 #include "ctype.h"
 #include "cJSON.h"
-#include "userconfig.h"
 #include "lyuba.h"
 #include "Preferences.h"
 #include "esp_http_client.h"
@@ -53,6 +51,11 @@ static char access_token[256];
 static char negotiated_bearer_access_token[256];
 static char postBuf[1300];  // largest HTTP POST we can make
 static char tagBuf[128];
+
+static const char *host = NULL;
+static const char *pem = NULL;
+static const char *username = NULL;
+static const char *password = NULL;
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     switch(evt->event_id) {
@@ -148,9 +151,11 @@ static bool post_request(const char *path, const char *post_data, bool useBearer
 
     memset(&config, 0x00, sizeof(config));
     config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-    config.host = MASTODON_HOST;
+    config.host = host;
     config.path = path;
     config.event_handler = _http_event_handler;
+    config.cert_pem = pem;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -191,9 +196,11 @@ static bool get_request(const char *path, const char *post_data, bool useBearer)
 
     memset(&config, 0x00, sizeof(config));
     config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-    config.host = MASTODON_HOST;
+    config.host = host;
     config.path = path;
     config.event_handler = _http_event_handler;
+    config.cert_pem = pem;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -229,7 +236,11 @@ static bool get_request(const char *path, const char *post_data, bool useBearer)
 }
 
 
-void lyuba_init(void) {
+void lyuba_init(const char *_host, const char *_pem, const char *_username, const char *_password) {
+    host = _host;
+    pem = _pem;
+    username = _username;
+    password = _password;
     lyubastate = LYUBASTATE_INIT;
     httpBufCount = 0;
     preferences_lyuba.begin("lyuba", false);
@@ -241,7 +252,7 @@ static bool lyubastate_app_setup(void) {
 }
 
 static bool lyubastate_token_setup(void) {
-    snprintf(postBuf, sizeof(postBuf), "client_id=%s&client_secret=%s&grant_type=password&username=%s&password=%s&scope=write read follow", client_id, client_secret, MASTODON_USERNAME, MASTODON_PASSWORD);
+    snprintf(postBuf, sizeof(postBuf), "client_id=%s&client_secret=%s&grant_type=password&username=%s&password=%s&scope=write read follow", client_id, client_secret, username, password);
     return post_request("/oauth/token", postBuf, false);
 }
 

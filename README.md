@@ -1,59 +1,44 @@
-# Lyuba, Mastodon tooter for ESP32
+# Lyuba ESP32 Mastodon Library
 
-Lyuba is a minimal library for tooting (posting) and searching on the Mastodon social network.
+Arduino library for communicating with the Mastodon social network.
 
-## Getting started
+It supports sending toots and polling for the most recent status matching a hashtag.
 
-Edit src/userconfig.h to configure WiFi and Mastodon credentials
+After downloading, rename folder to 'lyuba' and install in Arduino Libraries folder. Restart Arduino IDE, then open File->Sketchbook->Library->lyuba->helloworld sketch.
 
-    #define WIFI_SSID "myssid"
-    #define WIFI_PASSWORD "wifipassword"
+Compatibility notes: ESP32 only (ESP32 variants should work but are untesed)
 
-    #define MASTODON_HOST "fosstodon.org"
-    #define MASTODON_USERNAME "my@email.com"
-    #define MASTODON_PASSWORD "mastodonpassword"
+## Installation
 
-Build the code and flash it to an attached ESP32
+ 1. Download the repository as a zip file
+ 2. In the Arduino IDE, navigate to Sketch -> Include Library -> Add .ZIP Library
 
-    pio run --target upload
+## Example sketches
 
-Alternatively, build the code using docker by running
+ - helloworld, authenticate using username and password, send a single toot
+ - helloworld_token, authenticate using an access_token
+ - analogtoot, authenticate using username and password, send a toot every 10s with an analog sensor reading
+ - cheerlights, authenticate using username and password, monitor "#cheerlights" hashtag, parse colour name and show it on a single neopixel
 
-    make
+## Configuring sketches
 
-The binaries will be produced in `artefacts/` and can be flashed manually to the ESP32.
+All sketches must be setup for your WiFi network and Mastodon account. At the top of each sketch, update as follows:
 
-To interact, connect a serial terminal, 8N1@115200bps.
+ - `WIFI_SSID` your WiFi ssid
+ - `WIFI_PASSWORD` your WiFi password
+ - `MASTODON_USERNAME` your Mastodon username (username@domain.tld)
+ - `MASTODON_PASSWORD` your Mastodon password
+ - `MASTODON_HOST` the hostname of the Mastodon instance you use, e.g. "fosstodon.org" or "mastodon.social"
 
-Setup Lyuba as an authenticated app, type:
+Lyuba connects securely with HTTPS to the Mastodon server. To do this, it needs the HTTPS certificate of your `MASTODON_HOST` to be defined as `MASTODON_PEM`. To fetch the certificate, run the following command in a terminal (replace `fosstodon.org` with your `MASTODON_HOST`:
 
-    auth
-
-You should see
-
-    Authorisation OK, ready to toot
-
-Send a toot, type:
-
-    toot Hello World!
-
-Search for the most recent status for a hashtag:
-
-    search cheerlights
+	openssl s_client -showcerts -connect fosstodon.org:443 </dev/null 2>/dev/null|openssl x509 -outform PEM | sed -e 's/^/"/' | sed -e 's/$/\\n"/' | sed -e '$ ! s/$/ \\/'
+	
+If you are using token authentication instead of username and password, `MASTODON_TOKEN` should have the string "Bearer " followed by your token. To generate a token go to your Mastodon instance web site, click "Preferences" -> "Development" -> "New application". Give the application a name, everything else is optional. Click "Submit", then click on your new application in the list. Read off the "Your access token", prefix it with "Bearer " and place in `MASTODON_TOKEN`.
 
 ## Storage of access token
 
-The `auth` command sets Lyuba authentication up by registering an app with your Mastodon account. To avoid re-registering every time, the credentials (access token) are stored in the ESP32 flash using the `Preferences` module. After rebooting, the credentials can be retrieved and re-used. Reboot, then type:
-
-    getauth
-
-You should see:
-
-    Retrieved stored token OK: 'Bearer....'
-
-You can then,
-
-    toot A new message
+The `lyuba_auth()` call sets Lyuba authentication up by registering an app with your Mastodon account. To avoid re-registering every time, the credentials (access token) are stored in the ESP32 flash using the `Preferences` module. After rebooting, the credentials can be retrieved and re-used with `lyuba_getAuthToken()`.
 
 ## API
 
@@ -61,7 +46,9 @@ See `lyuba.h` for the API prototypes.
 
 To initialise the library, call:
 
-    lyuba_init();
+    lyuba_init(const char *host, const char *pem, const char *username, const char *password);
+
+`host` is the Mastodon server to connect to, `pem` is the HTTPS certificate for the host, `username` and `password` are the credentials and may be `NULL` if token authenticated is to be used.
 
 In your sketch's main loop, regularly call:
 
@@ -103,24 +90,13 @@ Where `searchCb` is a callback function:
 
 On finding a status matching the given tag `ok`=`true` and `content` contains the status string (including HTML tags)
 
-## Use without embedding password into firmware
-
-For security reasons you might not want to embed a Mastodon password into your code. Lyuba can also work directly with an access token that you create from the web interface.
-
-In your Mastodon instance web site, go to "Preferences" -> "Development" -> "New application". Give the application a name, everything else is optional. Click "Submit", then click on your new application in the list. Read off the "Your access token" and note it down.
-
-The access token can be used with Lyuba by adding "Bearer " to the beginning and passing it to `lyuba_toot()`. For example, if your access token is "abc123", then you can toot with:
-
-    lyuba_init();
-    lyuba_toot("Bearer abc123", "Hello world", NULL);
-
 ## Notes
 
- - Lyuba should be considered insecure. No certificate checks are performed and your Mastodon password is baked into your firmware
+ - Lyuba should be considered insecure. Your Mastodon password is baked into your firmware unless token authentication is used
  - Lyuba is not thread safe, it expects to be used in an asynchronous manner by a single task
 
 ## License
 
-Lyuba is MIT licensed.
+Lyuba is MIT licensed
 
-See other source files for their respective licenses
+cJSON Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
