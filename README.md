@@ -2,6 +2,8 @@
 
 Arduino library for communicating with the Mastodon social network.
 
+https://fosstodon.org/web/@lyuba
+
 Toby Jaffey @tobyjaffey@mastodon.me.uk
 
 Lyuba supports sending toots and polling for the most recent status matching a hashtag.
