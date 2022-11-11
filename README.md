@@ -2,7 +2,9 @@
 
 Arduino library for communicating with the Mastodon social network.
 
-It supports sending toots and polling for the most recent status matching a hashtag.
+Toby Jaffey @tobyjaffey@mastodon.me.uk
+
+Lyuba supports sending toots and polling for the most recent status matching a hashtag.
 
 After downloading, rename folder to 'lyuba' and install in Arduino Libraries folder. Restart Arduino IDE, then open File->Sketchbook->Library->lyuba->helloworld sketch.
 
