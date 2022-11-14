@@ -53,7 +53,6 @@ static char postBuf[1300];  // largest HTTP POST we can make
 static char tagBuf[128];
 
 static const char *host = NULL;
-static const char *pem = NULL;
 static const char *username = NULL;
 static const char *password = NULL;
 
@@ -154,7 +153,6 @@ static bool post_request(const char *path, const char *post_data, bool useBearer
     config.host = host;
     config.path = path;
     config.event_handler = _http_event_handler;
-    config.cert_pem = pem;
     config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -199,7 +197,6 @@ static bool get_request(const char *path, const char *post_data, bool useBearer)
     config.host = host;
     config.path = path;
     config.event_handler = _http_event_handler;
-    config.cert_pem = pem;
     config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -236,9 +233,8 @@ static bool get_request(const char *path, const char *post_data, bool useBearer)
 }
 
 
-void lyuba_init(const char *_host, const char *_pem, const char *_username, const char *_password) {
+void lyuba_init(const char *_host, const char *_username, const char *_password) {
     host = _host;
-    pem = _pem;
     username = _username;
     password = _password;
     lyubastate = LYUBASTATE_INIT;

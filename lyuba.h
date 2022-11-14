@@ -7,7 +7,7 @@ typedef void (*lyuba_auth_cb_t)(bool ok, const char *authToken);
 typedef void (*lyuba_toot_cb_t)(bool ok);
 typedef void (*lyuba_search_cb_t)(bool ok, const char *content);
 
-void lyuba_init(const char *host, const char *pem, const char *username, const char *password);
+void lyuba_init(const char *host, const char *username, const char *password);
 void lyuba_loop(void);
 
 void lyuba_authenticate(lyuba_auth_cb_t cb);

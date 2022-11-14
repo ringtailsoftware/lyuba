@@ -34,10 +34,6 @@ All sketches must be setup for your WiFi network and Mastodon account. At the to
  - `MASTODON_PASSWORD` your Mastodon password
  - `MASTODON_HOST` the hostname of the Mastodon instance you use, e.g. "fosstodon.org" or "mastodon.social"
 
-Lyuba connects securely with HTTPS to the Mastodon server. To do this, it needs the HTTPS certificate of your `MASTODON_HOST` to be defined as `MASTODON_PEM`. To fetch the certificate, run the following command in a terminal (replace `fosstodon.org` with your `MASTODON_HOST`:
-
-	openssl s_client -showcerts -connect fosstodon.org:443 </dev/null 2>/dev/null|openssl x509 -outform PEM | sed -e 's/^/"/' | sed -e 's/$/\\n"/' | sed -e '$ ! s/$/ \\/'
-	
 If you are using token authentication instead of username and password, `MASTODON_TOKEN` should have the string "Bearer " followed by your token. To generate a token go to your Mastodon instance web site, click "Preferences" -> "Development" -> "New application". Give the application a name, everything else is optional. Click "Submit", then click on your new application in the list. Read off the "Your access token", prefix it with "Bearer " and place in `MASTODON_TOKEN`.
 
 ## Storage of access token
@@ -50,9 +46,9 @@ See `lyuba.h` for the API prototypes.
 
 To initialise the library, call:
 
-    lyuba_init(const char *host, const char *pem, const char *username, const char *password);
+    lyuba_init(const char *host, const char *username, const char *password);
 
-`host` is the Mastodon server to connect to, `pem` is the HTTPS certificate for the host, `username` and `password` are the credentials and may be `NULL` if token authenticated is to be used.
+`host` is the Mastodon server to connect to, `username` and `password` are the credentials and may be `NULL` if token authenticated is to be used.
 
 In your sketch's main loop, regularly call:
 
