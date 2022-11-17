@@ -8,7 +8,7 @@ Toby Jaffey @tobyjaffey@mastodon.me.uk
 
 Lyuba supports sending toots and polling for the most recent status matching a hashtag.
 
-After downloading, rename folder to 'lyuba' and install in Arduino Libraries folder. Restart Arduino IDE, then open File->Sketchbook->Library->lyuba->helloworld sketch.
+After downloading, rename folder to 'lyuba' and install in Arduino Libraries folder. Restart Arduino IDE, then open `File->Sketchbook->Library->lyuba->helloworld` sketch.
 
 Compatibility notes: ESP32 only (ESP32 variants should work but are untesed)
 
@@ -19,10 +19,11 @@ Compatibility notes: ESP32 only (ESP32 variants should work but are untesed)
 
 ## Example sketches
 
- - helloworld, authenticate using username and password, send a single toot
- - helloworld_token, authenticate using an access_token
- - analogtoot, authenticate using username and password, send a toot every 10s with an analog sensor reading
- - cheerlights, authenticate using username and password, monitor "#cheerlights" hashtag, parse colour name and show it on a single neopixel
+ - `helloworld`, authenticate using username and password, send a single toot
+ - `helloworld_token`, authenticate using an access token
+ - `analogtoot`, authenticate using username and password, send a toot every 10s with an analog sensor reading
+ - `publicstream`, authenticate using username and password, monitor public stream and print every toot
+ - `cheerlights`, authenticate using username and password, monitor "#cheerlights" hashtag, parse colour name and show it on a single neopixel
 
 ## Configuring sketches
 
@@ -46,17 +47,17 @@ See `lyuba.h` for the API prototypes.
 
 To initialise the library, call:
 
-    lyuba_init(const char *host, const char *username, const char *password);
+    lyuba_t *myLyuba = lyuba_init(const char *host, const char *username, const char *password);
 
-`host` is the Mastodon server to connect to, `username` and `password` are the credentials and may be `NULL` if token authenticated is to be used.
+`host` is the Mastodon server to connect to, `username` and `password` are the credentials and may be `NULL` if token authenticated is to be used. Returns a `lyuba_t*` which must be passed to other API calls.
 
 In your sketch's main loop, regularly call:
 
-    lyuba_loop();
+    lyuba_loop(myLyuba);
 
 To start the authentication process, call:
 
-    lyuba_authenticate(authCb);
+    lyuba_authenticate(myLyuba, authCb);
 
 Where `authCb` is a callback function. If `NULL` is used, authentication will occur but no callback will be made to the sketch:
 
@@ -66,13 +67,13 @@ On successful authentication, `ok`=`true` and `authToken` will contain the authe
 
 To read back a saved authentication token:
 
-    const char *authToken = lyuba_getAuthToken();
+    const char *authToken = lyuba_getAuthToken(myLyuba);
 
 `lyuba_getAuthToken()` will return NULL if no token as been setup. If this is the case, call `lyuba_authenticate()`.
 
 To toot, call:
 
-    lyuba_toot(authToken, "Hello World!", tootCb);
+    lyuba_toot(myLyuba, authToken, "Hello World!", tootCb);
 
 Where `tootCb` is a callback function. If `NULL` is used, tooting will occur but no callback will be made to the sketch:
 
@@ -80,20 +81,29 @@ Where `tootCb` is a callback function. If `NULL` is used, tooting will occur but
 
 On successful tooting, `ok`=`true`. On failure `ok`=`false`
 
-To search for a tag (only returns the most recently posted status), call:
+To stream all public toots, call:
 
-    void lyuba_searchTag(authToken, "cheerlights", searchCb);
+    lyuba_conn_t *myConn = lyuba_stream(myLyuba, authToken, "public", streamCb);
 
-Where `searchCb` is a callback function:
+To stream a hashtag, call:
 
-    void searchCb(bool ok, const char *content) { }
+    lyuba_conn_t *myConn = lyuba_stream(myLyuba, authToken, "hashtag?tag=cheerlights", streamCb);
 
-On finding a status matching the given tag `ok`=`true` and `content` contains the status string (including HTML tags)
+For more details of available streams, see https://docs.joinmastodon.org/methods/timelines/streaming/
+
+Where `streamCb` is a callback function which is passed each toot, pre-stripped of HTML tags:
+
+    void streamCb(bool ok, const char *username, const char *content) { }
+
+To close a stream, call:
+
+    lyuba_close(myConn);
 
 ## Notes
 
  - Lyuba should be considered insecure. Your Mastodon password is baked into your firmware unless token authentication is used
  - Lyuba is not thread safe, it expects to be used in an asynchronous manner by a single task
+ - Running mulitple streams and requests concurrently is not well tested
 
 ## License
 

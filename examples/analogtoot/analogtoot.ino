@@ -13,6 +13,7 @@
 
 static const char *authToken = NULL;
 static uint32_t lastTootedTime = 0;
+static lyuba_t *lyuba = NULL;
 
 static void authCb(bool ok, const char *_authToken) {
     if (ok) {
@@ -47,12 +48,19 @@ void setup(void) {
 
     connectToWiFi(WIFI_SSID, WIFI_PASSWORD);
 
-    lyuba_init(MASTODON_HOST, MASTODON_USERNAME, MASTODON_PASSWORD);
-    authToken = lyuba_getAuthToken();
+    lyuba = lyuba_init(MASTODON_HOST, MASTODON_USERNAME, MASTODON_PASSWORD);
+    if (lyuba == NULL) {
+        Serial.printf("lyuba_init failed!");
+        while(1) {
+            delay(1000);
+        }
+    }
+
+    authToken = lyuba_getAuthToken(lyuba);
     if (authToken != NULL) {
         Serial.printf("Retrieved stored token OK: '%s'\r\n", authToken);
     } else {
-        lyuba_authenticate(authCb);
+        lyuba_authenticate(lyuba, authCb);
     }
 }
 
@@ -65,13 +73,13 @@ static void tootCb(bool ok) {
 }
 
 void loop(void) {
-    lyuba_loop();
+    lyuba_loop(lyuba);
     if (authToken != NULL) {    // have authenticated
         if (millis() > lastTootedTime + 10000) {
             char str[128];
             snprintf(str, sizeof(str), "Analog read %d/4096", analogRead(ANALOG_PIN));
             Serial.printf("Tooting: '%s'\r\n", str);
-            lyuba_toot(authToken, str, tootCb);
+            lyuba_toot(lyuba, authToken, str, tootCb);
             lastTootedTime = millis();
         }
     }

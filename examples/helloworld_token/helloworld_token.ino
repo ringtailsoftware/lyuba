@@ -1,7 +1,6 @@
 #include <WiFi.h>
 #include <lyuba.h>
 
-
 // UPDATE ALL OF THE FOLLOWING FOR YOUR WIFI AND MASTODON ACCOUNT
 #define WIFI_SSID "myssid"
 #define WIFI_PASSWORD "mypassword"
@@ -9,6 +8,8 @@
 #define MASTODON_TOKEN "Bearer abc123"
 #define MASTODON_HOST "fosstodon.org"
 
+
+static lyuba_t *lyuba = NULL;
 static bool haveTooted = false;
 
 void connectToWiFi(const char * ssid, const char * pwd) {
@@ -31,7 +32,13 @@ void setup(void) {
     Serial.begin(115200);
     connectToWiFi(WIFI_SSID, WIFI_PASSWORD);
 
-    lyuba_init(MASTODON_HOST, NULL, NULL);
+    lyuba = lyuba_init(MASTODON_HOST, NULL, NULL);
+    if (lyuba == NULL) {
+        Serial.printf("lyuba_init failed!");
+        while(1) {
+            delay(1000);
+        }
+    }
 }
 
 static void tootCb(bool ok) {
@@ -44,9 +51,11 @@ static void tootCb(bool ok) {
 }
 
 void loop(void) {
-    lyuba_loop();
+    lyuba_loop(lyuba);
+
     if (!haveTooted) {  // have not yet tooted
-        lyuba_toot(MASTODON_TOKEN, "Hello world", tootCb);
+        lyuba_toot(lyuba, MASTODON_TOKEN, "Hello world", tootCb);
+        haveTooted = true;
     }
 }
 
